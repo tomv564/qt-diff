@@ -1,6 +1,6 @@
 [submodule "edbee-lib"]
 	path = edbee-lib
-	url = git@github.com:edbee/edbee-lib
+	url = git@github.com:tomv564/edbee-lib
 [submodule "diff-match-patch-cpp-stl"]
 	path = diff-match-patch-cpp-stl
 	url = https://github.com/leutloff/diff-match-patch-cpp-stl.git
