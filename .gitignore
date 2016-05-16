@@ -16,3 +16,4 @@
 # qt-creator build directories:
 build-*
 *.pro.user
+/debug

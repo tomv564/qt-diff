@@ -38,47 +38,62 @@ string getFileContents(const char* path)
     return NULL;
 }
 
-void summarizeLines(QVector<QVector<stringdiff::Diff*>> lookup) {
+void summarizeLines(QVector<QVector<stringdiff::Diff>> lookup) {
     
-    for (int line = 0; line < lookup.size(); ++line) {
+    for (int line = 0; line < lookup.count(); ++line) {
         
-        QVector<stringdiff::Diff*> diffs = lookup.at(line);
-        
-        
-            for (int i = 0; i < diffs.size(); ++i) {
-                stringdiff::Diff* diff = diffs.at(i);
-                if (diff != NULL) {
-                    qDebug() << "line" << line << "diff" << i << "op" << (*diff).operation;
-                }
-            }
-        
+        QVector<stringdiff::Diff> diffs = lookup.at(line);
+
+        for (int i = 0; i < diffs.count(); ++i) {
+            stringdiff::Diff diff = diffs.at(i);
+            qDebug() << "line" << line << "diff" << i << "op" << diff.operation;
+        }
         
     }
 }
 
-QVector<QVector<stringdiff::Diff*>> createDiffLookup(list<stringdiff::Diff> diffs, stringdiff::Operation operation) {
-    int lineNumber = 0;
+QVector<QVector<stringdiff::Diff>> createDiffLookup(list<stringdiff::Diff> diffs, stringdiff::Operation operation) {
+    int lineIndex = 0;
     
     // we want pointers to the diffs, not the original object.
-    QVector<QVector<stringdiff::Diff*>> diffsPerLine(100, QVector<stringdiff::Diff*>());
+    QVector<QVector<stringdiff::Diff>> diffsPerLine(100, QVector<stringdiff::Diff>());
     qDebug() << "Diff lookup for operation" << operation;
     
     // iterator over each diff
-    for (list<stringdiff::Diff>::iterator it=diffs.begin(); it != diffs.end(); ++it)
+	auto end = diffs.end();
+    for (list<stringdiff::Diff>::iterator it=diffs.begin(); it != end; ++it)
     {
-        qDebug() << it->text.c_str();
+		qDebug() << it->text.c_str();
         bool isRelevant = it->operation == stringdiff::EQUAL || it->operation == operation; // no change or delete/insert
         int lineCount = (int) count(it->text.begin(), it->text.end(), '\n');
-        qDebug() << lineCount+1 << "lines of" << it->operation << ", relevant is" << isRelevant;
+        //qDebug() << it->operation << ", relevant is" << isRelevant;
+		
+		if (isRelevant) {
+			stringdiff::Diff diff = *it;
+		
+			if (lineCount == 0)
+			{
+				diffsPerLine[lineIndex].append(diff);
+			}
+			else 
+			{
+				for (int offset = 0; offset < lineCount; ++offset)
+				{
+					diffsPerLine[lineIndex].append(diff);
+					lineIndex = lineIndex + 1;
+					qDebug() << "line" << lineIndex << it->strOperation(it->operation).c_str();
+				}
+			}
+						
+		}
 
-        if (isRelevant) {
-            for (int lineOffset = 0; lineOffset <= lineCount; ++lineOffset) {
-                int currentLine = lineNumber + lineOffset;
+            //for (int lineOffset = 0; lineOffset < lineCount; ++lineOffset) {
+            //    int currentLine = lineNumber + lineOffset;
                 
 //                qDebug() << "Trying line" << currentLine;
-                stringdiff::Diff* diff = &*it;
-                diffsPerLine[currentLine].append(diff);
-                qDebug() << "appended" << diff->operation;
+              //  stringdiff::Diff diff = *it;
+               // diffsPerLine[currentLine].append(diff);
+                //qDebug() << "appended" << diff.operation;
 //                QVector<stringdiff::Diff*> diffsAtLine = diffsPerLine.at(currentLine);
 //                diffsAtLine.append(diff);
 //                qDebug() << diffsAtLine;
@@ -91,9 +106,9 @@ QVector<QVector<stringdiff::Diff*>> createDiffLookup(list<stringdiff::Diff> diff
 //                //            int currentLine = lineNumber + lineOffset;
 //                //            if (diffsPerLine[currentLine] == NULL) { diffsPerLine[currentLine]
 //                qDebug() << "Line " << lineNumber + lineOffset << " change " << it->operation;
-            }
-            lineNumber += lineCount;
-        }
+           // }
+            //lineNumber += lineCount;
+        //}
     }
     
     return diffsPerLine;
@@ -137,11 +152,18 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-//    string leftContent = "<html>\n\t<title>Yo</title>\n\t<body>\n\t\t<h1>Hello Left</h1>\n\t</body>\n</html>\n";
-//    string rightContent = "<html>\n\t<body>\n\t\t<h1>Hello Right</h1>\n\t</body>\n\t<footer>fin</footer>\n</html>\n";
-//    
-    string leftContent = "asdf";
-    string rightContent = "asdf";
+	//string leftContent = "<html>\n\t<title>Yo</title>\n\t<body>\n\t\t<h1>Hello Left</h1>\n\t</body>\n</html>\n";
+	//string rightContent = "<html>\n\t<body>\n\t\t<h1>Hello Right</h1>\n\t</body>\n\t<footer>fin</footer>\n</html>\n";
+
+	//string leftContent = "Mary had a little lamb,\nwhose fleece was white as snow.\n\n\nIt followed her to school one day,\nschool one day, school one day,\nwhich was against the rules.\n\n";
+	//string rightContent = "Mary had a little lamb,\nwhose fleece was red as snow.\n\n\And everywhere that Mary went,\nthe lamb was sure to go.\n\nIt followed her to school one day,\nwhich was against the rules.\n\n";
+
+	string leftContent = "Mary had a little lamb,\nwhose fleece was white as snow.\n\n";
+	string rightContent = "Mary had a little lamb,\nwhose fleece was red as snow.\n\nAnd everywhere that Mary went,\nthe lamb was sure to go.\n";
+
+	////    
+    //string leftContent = "asdf\nyo";
+    //string rightContent = "asdf\nbe";
     
 //    if (argc > 2) {
 //        
@@ -160,7 +182,7 @@ int main(int argc, char *argv[])
    
     // get the minimal diff
     diff_match_patch<string> dmp;
-    auto diffs = dmp.diff_main(leftContent, rightContent);
+    auto diffs = dmp.diff_lines(leftContent, rightContent);
     
     auto deletionLookup = createDiffLookup(diffs, stringdiff::DELETE);
     summarizeLines(deletionLookup);
@@ -217,7 +239,8 @@ int main(int argc, char *argv[])
     // show the window
     // next create the main window and the editor
     QMainWindow win;
+	win.setMinimumSize(800, 600);
     win.setCentralWidget( splitter );
-    win.show();
+	win.show();
     return a.exec();
 }
