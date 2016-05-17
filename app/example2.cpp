@@ -19,11 +19,12 @@ using namespace std;
 #include "edbee/texteditorwidget.h"
 #include "edbee/views/textrenderer.h"
 #include "edbee/views/texttheme.h"
+#include "edbee/models/texteditorconfig.h"
 //#include "diff_match_patch.h"
 
 typedef diff_match_patch<string> stringdiff;
 
-string getFileContents(const char* path)
+string getFileContents(string path)
 {
     ifstream myfile(path);
     if (myfile.is_open())
@@ -34,7 +35,7 @@ string getFileContents(const char* path)
         // TODO: who deallocates buffer and myfile?
         return buffer.str();
     }
-    else qDebug() << "Unable to open file" << path;
+    else qDebug() << "Unable to open file" << path.c_str();
     return NULL;
 }
 
@@ -86,29 +87,6 @@ QVector<QVector<stringdiff::Diff>> createDiffLookup(list<stringdiff::Diff> diffs
 			}
 						
 		}
-
-            //for (int lineOffset = 0; lineOffset < lineCount; ++lineOffset) {
-            //    int currentLine = lineNumber + lineOffset;
-                
-//                qDebug() << "Trying line" << currentLine;
-              //  stringdiff::Diff diff = *it;
-               // diffsPerLine[currentLine].append(diff);
-                //qDebug() << "appended" << diff.operation;
-//                QVector<stringdiff::Diff*> diffsAtLine = diffsPerLine.at(currentLine);
-//                diffsAtLine.append(diff);
-//                qDebug() << diffsAtLine;
-//
-                // dereference and grab address of iterator.
-                
-                
-////                auto diffsAtLine = diffsPerLine->at(currentLine
-//                
-//                //            int currentLine = lineNumber + lineOffset;
-//                //            if (diffsPerLine[currentLine] == NULL) { diffsPerLine[currentLine]
-//                qDebug() << "Line " << lineNumber + lineOffset << " change " << it->operation;
-           // }
-            //lineNumber += lineCount;
-        //}
     }
     
     return diffsPerLine;
@@ -122,35 +100,23 @@ bool fileExists(QString path) {
 }
 
 
-/// This is an example that shows how to load a grammar file and a theme file
-/// manually and initialise the editor with it
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
 
+	QString appDataPath_;
+#ifdef Q_OS_MAC
+	appDataPath_ = applicationDirPath() + "/../Resources/";
+#else
+	appDataPath_ = qApp->applicationDirPath() + "/data/";
+#endif
+
     // initialize edbee
     edbee::Edbee* edbee = edbee::Edbee::instance();
+	edbee->setKeyMapPath(QString("%1%2").arg(appDataPath_).arg("keymaps"));
+	edbee->setGrammarPath(QString("%1%2").arg(appDataPath_).arg("syntaxfiles"));
+	edbee->setThemePath(QString("%1%2").arg(appDataPath_).arg("themes"));
     edbee->autoInit();
-    
-    // TODO: Check the edbee app for a proper way to detect grammars and themes.
-
-    // read the grammar file
-    edbee::TextGrammarManager* grammarManager = edbee->grammarManager();
-    edbee::TextGrammar* grammar = grammarManager->readGrammarFile( "HTML.tmLanguage" );
-    if( !grammar ) {
-        qDebug() << "Grammar couldn't be loaded: " << grammarManager->lastErrorMessage();
-        edbee->shutdown(); // call this method manuall to prevent memory leak warnings. When the exec method is called this isn't required
-        return 1;
-    }
-
-    // read the theme file
-    edbee::TextThemeManager* themeManager = edbee->themeManager();
-    edbee::TextTheme* theme = themeManager->readThemeFile( "Solarized (Dark).tmTheme" );
-    if( !theme) {
-        qDebug() << "Theme couldn't be loaded: " << themeManager->lastErrorMessage();
-        edbee->shutdown(); // call this method manuall to prevent memory leak warnings. When the exec method is called this isn't required
-        return 1;
-    }
 
 	//string leftContent = "<html>\n\t<title>Yo</title>\n\t<body>\n\t\t<h1>Hello Left</h1>\n\t</body>\n</html>\n";
 	//string rightContent = "<html>\n\t<body>\n\t\t<h1>Hello Right</h1>\n\t</body>\n\t<footer>fin</footer>\n</html>\n";
@@ -161,54 +127,31 @@ int main(int argc, char *argv[])
 	string leftContent = "Mary had a little lamb,\nwhose fleece was white as snow.\n\n";
 	string rightContent = "Mary had a little lamb,\nwhose fleece was red as snow.\n\nAnd everywhere that Mary went,\nthe lamb was sure to go.\n";
 
-	////    
-    //string leftContent = "asdf\nyo";
-    //string rightContent = "asdf\nbe";
-    
-//    if (argc > 2) {
-//        
-//        char* file1 = argv[1];
-//        char* file2 = argv[2];
-//  
-//        if (fileExists(file1)) {
-//            leftContent = getFileContents(file1);
-//        }
-//        
-//        if (fileExists(file2)) {
-//            rightContent = getFileContents(file2);
-//        }
-//        
-//    }
+	string leftFile = "left.txt";
+	string rightFile = "right.txt";
+
+    if (argc > 2) {
+        
+		leftFile = argv[0];
+		rightFile = argv[1];
+  
+        if (fileExists(QString::fromStdString(leftFile))) {
+            leftContent = getFileContents(leftFile);
+        }
+        
+        if (fileExists(QString::fromStdString(rightFile))) {
+            rightContent = getFileContents(rightFile);
+        }
+        
+    }
    
-    // get the minimal diff
     diff_match_patch<string> dmp;
     auto diffs = dmp.diff_lines(leftContent, rightContent);
-    
     auto deletionLookup = createDiffLookup(diffs, stringdiff::DELETE);
-    summarizeLines(deletionLookup);
-    
-    
     auto insertLookup = createDiffLookup(diffs, stringdiff::INSERT);
-    summarizeLines(insertLookup);
-//
-//    auto deletions = findDiffsByLine(diffs, stringdiff::DELETE);
-//    auto insertions = findDiffsByLine(diffs, stringdiff::INSERT);
-    
-//    for (int i = 0; i < deletions.size(); ++i) {
-//        qDebug() << deletions[i] << " ";
-//    }
-//    
 
-    // TODO: generate a diff object to be used by both.
-    /*
-     
-     Options:
-     
-     Set a unified diff to both sides, with left interpreting differently from right.
-     * left: '-' means red
-     * right: '+' means green
-     * both: '-' followed by '+' means change
-     
+	/*
+
      We need support for:
      
      * Shading of line number columns?
@@ -217,20 +160,21 @@ int main(int argc, char *argv[])
      
      */
     
+	QFont font = QFont("Consolas", 12);
     // TODO: read only?
     edbee::TextEditorWidget left;
-    left.textDocument()->setLanguageGrammar( grammar );
-    left.textRenderer()->setTheme( theme );
+	left.config()->setFont(font);
+	left.config()->setThemeName("Oceanic Next");
+	left.textDocument()->setLanguageGrammar(edbee::Edbee::instance()->grammarManager()->detectGrammarWithFilename(QString::fromStdString(leftFile)));
     left.textDocument()->setDiffLookup(deletionLookup);
     left.textDocument()->setText(QString::fromStdString(leftContent));
-//    left.textDocument()->setDiffStatus(&deletions);
-    
+
     edbee::TextEditorWidget right;
-    right.textDocument()->setLanguageGrammar( grammar );
-    right.textRenderer()->setTheme( theme );
+	right.config()->setFont(font);
+	right.config()->setThemeName("Oceanic Next");
+	right.textDocument()->setLanguageGrammar(edbee::Edbee::instance()->grammarManager()->detectGrammarWithFilename(QString::fromStdString(rightFile)));
     right.textDocument()->setDiffLookup(insertLookup);
     right.textDocument()->setText(QString::fromStdString(rightContent));
-//    right.textDocument()->setDiffStatus(&insertions);
     
     QSplitter *splitter = new QSplitter();
     splitter->addWidget(&left);
