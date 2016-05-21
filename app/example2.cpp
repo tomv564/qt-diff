@@ -57,12 +57,12 @@ QVector<QVector<stringdiff::Diff>> createDiffLookup(list<stringdiff::Diff> diffs
     int lineIndex = 0;
     
     // we want pointers to the diffs, not the original object.
-    QVector<QVector<stringdiff::Diff>> diffsPerLine(100, QVector<stringdiff::Diff>());
+	QVector<QVector<stringdiff::Diff>> diffsPerLine;
+	diffsPerLine.append(QVector<stringdiff::Diff>());
     qDebug() << "Diff lookup for operation" << operation;
     
     // iterator over each diff
-	auto end = diffs.end();
-    for (list<stringdiff::Diff>::iterator it=diffs.begin(); it != end; ++it)
+    for (list<stringdiff::Diff>::iterator it=diffs.begin(); it != diffs.end(); ++it)
     {
 		qDebug() << it->text.c_str();
         bool isRelevant = it->operation == stringdiff::EQUAL || it->operation == operation; // no change or delete/insert
@@ -81,6 +81,7 @@ QVector<QVector<stringdiff::Diff>> createDiffLookup(list<stringdiff::Diff> diffs
 				for (int offset = 0; offset < lineCount; ++offset)
 				{
 					diffsPerLine[lineIndex].append(diff);
+					diffsPerLine.append(QVector<stringdiff::Diff>());
 					lineIndex = lineIndex + 1;
 					qDebug() << "line" << lineIndex << it->strOperation(it->operation).c_str();
 				}
@@ -132,9 +133,9 @@ int main(int argc, char *argv[])
 
     if (argc > 2) {
         
-		leftFile = argv[0];
-		rightFile = argv[1];
-  
+		leftFile = argv[1];
+		rightFile = argv[2];
+
         if (fileExists(QString::fromStdString(leftFile))) {
             leftContent = getFileContents(leftFile);
         }
@@ -146,7 +147,7 @@ int main(int argc, char *argv[])
     }
    
     diff_match_patch<string> dmp;
-    auto diffs = dmp.diff_lines(leftContent, rightContent);
+    auto diffs = dmp.diff_main(leftContent, rightContent);
     auto deletionLookup = createDiffLookup(diffs, stringdiff::DELETE);
     auto insertLookup = createDiffLookup(diffs, stringdiff::INSERT);
 
