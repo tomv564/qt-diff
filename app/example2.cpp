@@ -14,12 +14,14 @@
 using namespace std;
 
 #include "edbee/edbee.h"
+#include "edbee/texteditorcontroller.h"
 #include "edbee/models/textdocument.h"
 #include "edbee/models/textgrammar.h"
 #include "edbee/texteditorwidget.h"
 #include "edbee/views/textrenderer.h"
 #include "edbee/views/texttheme.h"
 #include "edbee/models/texteditorconfig.h"
+
 //#include "diff_match_patch.h"
 
 typedef diff_match_patch<string> stringdiff;
@@ -147,9 +149,15 @@ int main(int argc, char *argv[])
     }
    
     diff_match_patch<string> dmp;
+/*
     auto diffs = dmp.diff_main(leftContent, rightContent);
     auto deletionLookup = createDiffLookup(diffs, stringdiff::DELETE);
     auto insertLookup = createDiffLookup(diffs, stringdiff::INSERT);
+*/
+
+	auto diffs = dmp.diff_lines(leftContent, rightContent);
+	auto deletionLookup = createDiffLookup(diffs, stringdiff::DELETE);
+	auto insertLookup = createDiffLookup(diffs, stringdiff::INSERT);
 
 	/*
 
@@ -167,15 +175,17 @@ int main(int argc, char *argv[])
 	left.config()->setFont(font);
 	left.config()->setThemeName("Oceanic Next");
 	left.textDocument()->setLanguageGrammar(edbee::Edbee::instance()->grammarManager()->detectGrammarWithFilename(QString::fromStdString(leftFile)));
-    left.textDocument()->setDiffLookup(deletionLookup);
     left.textDocument()->setText(QString::fromStdString(leftContent));
+	left.textDocument()->setDiffLookup(deletionLookup);
 
     edbee::TextEditorWidget right;
 	right.config()->setFont(font);
 	right.config()->setThemeName("Oceanic Next");
 	right.textDocument()->setLanguageGrammar(edbee::Edbee::instance()->grammarManager()->detectGrammarWithFilename(QString::fromStdString(rightFile)));
-    right.textDocument()->setDiffLookup(insertLookup);
     right.textDocument()->setText(QString::fromStdString(rightContent));
+	right.textDocument()->setDiffLookup(insertLookup);
+
+
     
     QSplitter *splitter = new QSplitter();
     splitter->addWidget(&left);
@@ -187,5 +197,12 @@ int main(int argc, char *argv[])
 	win.setMinimumSize(800, 600);
     win.setCentralWidget( splitter );
 	win.show();
-    return a.exec();
+
+	// scroll to first change
+	int leftOffset = deletionLookup[0][0].text.length();
+	left.controller()->scrollOffsetVisible(leftOffset);
+	int rightOffset = insertLookup[0][0].text.length();
+	right.controller()->scrollOffsetVisible(rightOffset);
+    
+	return a.exec();
 }
