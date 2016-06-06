@@ -196,6 +196,7 @@ int main(int argc, char *argv[])
     QMainWindow win;
 	win.setMinimumSize(800, 600);
     win.setCentralWidget( splitter );
+	win.setWindowTitle(QString::fromStdString(rightFile));
 	win.show();
 
 	// scroll to first change
