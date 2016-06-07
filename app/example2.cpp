@@ -5,6 +5,7 @@
 #include <QMainWindow>
 #include <QSplitter>
 #include <QFileInfo>
+#include <QPainter>
 
 #include <string>
 #include <iostream>
@@ -103,6 +104,126 @@ bool fileExists(QString path) {
 }
 
 
+
+class DiffSplitterHandle : public QSplitterHandle
+{
+public:
+	DiffSplitterHandle(edbee::TextEditorWidget* leftEditor, edbee::TextEditorWidget* rightEditor, QSplitter *parent = 0) : QSplitterHandle(Qt::Orientation::Horizontal, parent)
+	{
+		_leftEditorWidget = leftEditor;
+		_rightEditorWidget = rightEditor;
+		//_diffLookup = QVector<QVector<stringdiff::Diff>>(0);
+	}
+	void setDiffLookup(QVector<QVector<stringdiff::Diff>> diffLookup);
+
+protected:
+	void DiffSplitterHandle::paintEvent(QPaintEvent *event) override;
+	edbee::TextRenderer* DiffSplitterHandle::renderer() const;
+	int DiffSplitterHandle::getLineStatus(int line);
+
+
+private:
+	QVector<QVector<stringdiff::Diff>> _diffLookup;
+	edbee::TextEditorWidget* _leftEditorWidget;
+	edbee::TextEditorWidget* _rightEditorWidget;
+	
+};
+
+void DiffSplitterHandle::setDiffLookup(QVector<QVector<stringdiff::Diff>> diffLookup)
+{
+	_diffLookup = diffLookup;
+}
+
+edbee::TextRenderer* DiffSplitterHandle::renderer() const
+{
+	return _rightEditorWidget->textRenderer();
+}
+
+int DiffSplitterHandle::getLineStatus(int lineIndex) {
+	
+	if (_diffLookup.isEmpty()) return 0;
+	QVector<stringdiff::Diff> diffs = _diffLookup.at(lineIndex);
+	
+	// TODO: this would be cool
+	//if any_of(diffs.cbegin(), diffs.cend(), [](<diff_match_patch<string>::Diff* diff){ return })
+	bool inserted = false;
+	bool deleted = false;
+	for (int i = 0; i < diffs.count(); ++i) {
+		stringdiff::Diff diff = diffs.at(i);
+
+		//qDebug() << "line" << lineIndex << "diff" << i << "op" << diff.operation;// << "txt";// << diff->text;
+
+		if (diff.operation == stringdiff::DELETE) {
+			deleted = true;
+		}
+		if (diff.operation == stringdiff::INSERT) {
+			inserted = true;
+		}
+
+	}
+	//qDebug() << "line" << lineIndex << " deleted and inserted are" << deleted << inserted;
+	if (deleted && inserted) return 3;
+	if (inserted) return 2;
+	if (deleted) return 1;
+	return 0;
+	
+}
+
+void DiffSplitterHandle::paintEvent(QPaintEvent *event)
+{
+	QPainter painter(this);
+	int lineHeight = renderer()->lineHeight();
+	/*QBrush brush = QBrush(QColor(0, 0, 0), Qt::BrushStyle::SolidPattern);*/
+	painter.fillRect(event->rect(), QBrush());
+	const QSize& size = this->size();
+	QRect paintRect = event->rect();
+	//    QRect translatedRect( clipRect.x()+offsetX, clipRect.y()+offsetY, clipRect.width(), clipRect.height() );
+	//paintRect.adjust(0, top_, 0, top_);
+	renderer()->renderBegin(paintRect);
+	int startLine = renderer()->startLine();
+	int endLine = renderer()->endLine();
+	QColor baseColor = renderer()->theme()->backgroundColor();
+
+	QColor changedColor = baseColor.darker(120);
+
+	for (int line = startLine; line <= endLine; ++line) {
+
+		int changeType = getLineStatus(line);
+
+		if (changeType > 0) {
+			painter.fillRect(0, line*lineHeight, size.width(), lineHeight, changedColor);
+		}
+	}
+	renderer()->renderEnd(paintRect);
+
+
+}
+
+
+class DiffSplitter : public QSplitter
+{
+public:
+	DiffSplitter(edbee::TextEditorWidget* leftEditor, edbee::TextEditorWidget* rightEditor, QWidget *parent = 0) : QSplitter(Qt::Orientation::Horizontal, parent) 
+	{
+		_leftEditorWidget = leftEditor;
+		_rightEditorWidget = rightEditor;
+	}
+
+protected:
+	QSplitterHandle *createHandle();
+
+private:
+	edbee::TextEditorWidget* _leftEditorWidget;
+	edbee::TextEditorWidget* _rightEditorWidget;
+};
+
+QSplitterHandle *DiffSplitter::createHandle()
+{
+	return new DiffSplitterHandle(_leftEditorWidget, _rightEditorWidget, this);
+}
+
+
+
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
@@ -187,7 +308,9 @@ int main(int argc, char *argv[])
 
 
     
-    QSplitter *splitter = new QSplitter();
+    DiffSplitter *splitter = new DiffSplitter(&left, &right);
+
+	splitter->setHandleWidth(50);
     splitter->addWidget(&left);
     splitter->addWidget(&right);
 
@@ -198,6 +321,9 @@ int main(int argc, char *argv[])
     win.setCentralWidget( splitter );
 	win.setWindowTitle(QString::fromStdString(rightFile));
 	win.show();
+
+	DiffSplitterHandle* handle = (DiffSplitterHandle*)splitter->handle(1);
+	handle->setDiffLookup(deletionLookup);
 
 	// scroll to first change
 	int leftOffset = deletionLookup[0][0].text.length();
